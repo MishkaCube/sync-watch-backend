@@ -9,8 +9,6 @@ rezka:
     enabled: true
     path: ../rezka-service/main.py
     python: python3
-    email: mishka.barman@gmail.com
-    password: "7649232710"
 
 syncwatch:
   room:
