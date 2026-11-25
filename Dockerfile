@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build stage ----
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
 # Resolve dependencies first so this layer is cached until the build files change
@@ -14,7 +14,7 @@ RUN ./gradlew --no-daemon clean bootJar -x test \
     && cp "$(ls build/libs/*.jar | grep -v plain | head -1)" app.jar
 
 # ---- runtime stage ----
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
 COPY --from=build /workspace/app.jar app.jar
