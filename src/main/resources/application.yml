@@ -24,9 +24,6 @@ spring:
     multipart:
       max-file-size: 4GB
       max-request-size: 4GB
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
 
 logging:
   level:
