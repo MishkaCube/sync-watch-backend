@@ -12,3 +12,8 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # the image must stay on the Java version of the Gradle toolchain (21);
+      # change the toolchain, CI and Dockerfile together to move to a newer Java
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/MishkaCube/sync-watch-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/MishkaCube/sync-watch-backend/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
-![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-6db33f)
+![Spring Boot 4.2](https://img.shields.io/badge/Spring%20Boot-4.2-6db33f)
 
 Backend for **Sync Watch**, a small pet project for watching videos together in sync. One person creates a room, shares the link, and every participant's player stays at the same position: play, pause, seek and buffering are coordinated by the server.
 
@@ -22,7 +22,7 @@ Frontend: [`sync-watch-frontend`](https://github.com/MishkaCube/sync-watch-front
 
 ## Tech stack
 
-Java 21 · Spring Boot 3.3 · Spring WebSocket (STOMP over SockJS) · Gradle · Lombok · Caffeine · GitHub Actions
+Java 21 · Spring Boot 4.2 · Spring WebSocket (STOMP over SockJS) · Gradle · Lombok · Caffeine · GitHub Actions
 
 ## How synchronization works
 
