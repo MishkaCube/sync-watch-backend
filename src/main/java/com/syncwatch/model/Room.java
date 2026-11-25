@@ -25,4 +25,9 @@ public class Room {
     private Set<String> bufferingClients = ConcurrentHashMap.newKeySet();
     // whether the clock was playing before buffering froze it
     private boolean     playingBeforeBuffer = false;
+
+    /** Marks the room as active right now (used by the idle-room cleanup). */
+    public void touch() {
+        this.lastActivity = Instant.now();
+    }
 }

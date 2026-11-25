@@ -5,6 +5,9 @@ import com.syncwatch.model.BufferingEvent;
 import com.syncwatch.model.ClockEvent;
 import com.syncwatch.model.EventType;
 import com.syncwatch.model.PlayerEvent;
+import com.syncwatch.service.BufferingCoordinator;
+import com.syncwatch.service.InMemoryRoomRepository;
+import com.syncwatch.service.RoomRepository;
 import com.syncwatch.service.RoomService;
 import com.syncwatch.service.SourceCacheService;
 import com.syncwatch.sync.RoomBroadcaster;
@@ -33,10 +36,12 @@ class BufferingEventHandlersTest {
     @BeforeEach
     void setUp() {
         publisher = mock(RoomEventPublisher.class);
-        rooms = new RoomService(new SourceCacheService());
+        RoomRepository repository = new InMemoryRoomRepository();
+        rooms = new RoomService(repository, new SourceCacheService());
+        BufferingCoordinator coordinator = new BufferingCoordinator(repository);
         RoomBroadcaster broadcaster = new RoomBroadcaster(publisher);
-        start = new BufferingStartEventHandler(rooms, broadcaster);
-        end = new BufferingEndEventHandler(rooms, broadcaster);
+        start = new BufferingStartEventHandler(coordinator, broadcaster);
+        end = new BufferingEndEventHandler(coordinator, broadcaster);
     }
 
     private List<Object> published() {

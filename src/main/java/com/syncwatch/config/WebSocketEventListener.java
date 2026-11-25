@@ -5,8 +5,8 @@ import com.syncwatch.messaging.RoomTopics;
 import com.syncwatch.model.BufferingEvent;
 import com.syncwatch.model.ClockEvent;
 import com.syncwatch.model.ParticipantEvent;
-import com.syncwatch.service.RoomService;
-import com.syncwatch.service.RoomService.BufferingResult;
+import com.syncwatch.service.BufferingCoordinator;
+import com.syncwatch.service.BufferingCoordinator.BufferingResult;
 import com.syncwatch.service.ParticipantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -20,7 +20,7 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 public class WebSocketEventListener {
 
     private final ParticipantService participantService;
-    private final RoomService roomService;
+    private final BufferingCoordinator buffering;
     private final RoomEventPublisher publisher;
 
     @EventListener
@@ -47,7 +47,7 @@ public class WebSocketEventListener {
         if (roomId == null) return;
 
         // clear any buffering this client was holding (it left without buffering-end)
-        BufferingResult buf = roomService.bufferingRemove(roomId, sessionId);
+        BufferingResult buf = buffering.remove(roomId, sessionId);
         if (buf != null) {
             if (buf.clockChanged()) {
                 publisher.publish(roomId, ClockEvent.from(buf.clock()));

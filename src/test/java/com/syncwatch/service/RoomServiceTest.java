@@ -1,14 +1,14 @@
 package com.syncwatch.service;
 
+import com.syncwatch.model.EventType;
+import com.syncwatch.model.PlayerEvent;
 import com.syncwatch.model.Room;
 import com.syncwatch.model.RoomClock;
-import com.syncwatch.service.RoomService.BufferingResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
 
 class RoomServiceTest {
 
@@ -18,7 +18,7 @@ class RoomServiceTest {
 
     @BeforeEach
     void setUp() {
-        rooms = new RoomService(new SourceCacheService());
+        rooms = new RoomService(new InMemoryRoomRepository(), new SourceCacheService());
     }
 
     @Test
@@ -47,6 +47,16 @@ class RoomServiceTest {
     }
 
     @Test
+    @DisplayName("play, pause and seek move the shared clock")
+    void clockOperations() {
+        assertThat(rooms.clockPlay(ROOM, 10.0).isPlaying()).isTrue();
+        assertThat(rooms.clockSeek(ROOM, 50.0).getPosition()).isEqualTo(50.0);
+        RoomClock paused = rooms.clockPause(ROOM, 55.0);
+        assertThat(paused.isPlaying()).isFalse();
+        assertThat(paused.getPosition()).isEqualTo(55.0);
+    }
+
+    @Test
     @DisplayName("touch refreshes the last activity time")
     void touchRefreshesActivity() throws InterruptedException {
         rooms.touch(ROOM);
@@ -56,6 +66,12 @@ class RoomServiceTest {
         rooms.touch(ROOM);
 
         assertThat(rooms.lastActivity(ROOM)).isAfter(first);
+    }
+
+    @Test
+    @DisplayName("lastActivity of an unknown room is null")
+    void lastActivityOfUnknownRoom() {
+        assertThat(rooms.lastActivity("nope")).isNull();
     }
 
     @Test
@@ -69,66 +85,35 @@ class RoomServiceTest {
     }
 
     @Test
-    @DisplayName("when a client starts buffering a playing clock is frozen")
-    void bufferingFreezesPlayingClock() {
-        rooms.clockPlay(ROOM, 20.0);
+    @DisplayName("only a source-change event is remembered for late joiners")
+    void remembersOnlySourceChange() {
+        PlayerEvent source = new PlayerEvent();
+        source.setType(EventType.SOURCE_CHANGE);
+        source.setSourceValue("https://example.com/video.mp4");
+        rooms.touch(ROOM);
 
-        BufferingResult result = rooms.bufferingStart(ROOM, "alice");
+        rooms.updateLastSource(ROOM, source);
 
-        assertThat(result.count()).isEqualTo(1);
-        assertThat(result.clockChanged()).isTrue();
-        assertThat(result.clock().isPlaying()).isFalse();
-        assertThat(result.clock().getPosition()).isCloseTo(20.0, within(0.5));
+        assertThat(rooms.getRoom(ROOM)).get().extracting(Room::getLastSource).isEqualTo(source);
+
+        PlayerEvent pause = new PlayerEvent();
+        pause.setType(EventType.PAUSE);
+        rooms.updateLastSource("other", pause);
+        assertThat(rooms.getRoom("other")).isEmpty();
     }
 
     @Test
-    @DisplayName("buffering on a paused clock does not change the clock")
-    void bufferingOnPausedClock() {
-        rooms.clockPause(ROOM, 7.0);
+    @DisplayName("resetSource clears the source and rewinds the clock, paused")
+    void resetSource() {
+        PlayerEvent source = new PlayerEvent();
+        source.setType(EventType.SOURCE_CHANGE);
+        rooms.clockPlay(ROOM, 99.0);
+        rooms.updateLastSource(ROOM, source);
 
-        BufferingResult result = rooms.bufferingStart(ROOM, "alice");
+        RoomClock clock = rooms.resetSource(ROOM);
 
-        assertThat(result.clockChanged()).isFalse();
-        assertThat(result.clock().isPlaying()).isFalse();
-    }
-
-    @Test
-    @DisplayName("playback resumes only after every buffering client has recovered")
-    void resumesOnlyWhenAllRecovered() {
-        rooms.clockPlay(ROOM, 20.0);
-        rooms.bufferingStart(ROOM, "alice");
-        rooms.bufferingStart(ROOM, "bob");
-
-        BufferingResult first = rooms.bufferingEnd(ROOM, "alice");
-        assertThat(first.count()).isEqualTo(1);
-        assertThat(first.clockChanged()).isFalse();
-        assertThat(first.clock().isPlaying()).isFalse();
-
-        BufferingResult second = rooms.bufferingEnd(ROOM, "bob");
-        assertThat(second.count()).isZero();
-        assertThat(second.clockChanged()).isTrue();
-        assertThat(second.clock().isPlaying()).isTrue();
-    }
-
-    @Test
-    @DisplayName("a disconnecting buffering client releases the hold on the clock")
-    void disconnectReleasesBuffering() {
-        rooms.clockPlay(ROOM, 20.0);
-        rooms.bufferingStart(ROOM, "session-1");
-
-        BufferingResult result = rooms.bufferingRemove(ROOM, "session-1");
-
-        assertThat(result).isNotNull();
-        assertThat(result.clockChanged()).isTrue();
-        assertThat(result.clock().isPlaying()).isTrue();
-    }
-
-    @Test
-    @DisplayName("removing a client that was not buffering is a no-op")
-    void removeNonBufferingClient() {
-        rooms.clockPlay(ROOM, 20.0);
-
-        assertThat(rooms.bufferingRemove(ROOM, "unknown")).isNull();
-        assertThat(rooms.bufferingRemove("no-such-room", "unknown")).isNull();
+        assertThat(clock.isPlaying()).isFalse();
+        assertThat(clock.getPosition()).isZero();
+        assertThat(rooms.getRoom(ROOM)).get().extracting(Room::getLastSource).isNull();
     }
 }

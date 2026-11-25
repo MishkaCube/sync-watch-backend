@@ -2,8 +2,8 @@ package com.syncwatch.sync.handler;
 
 import com.syncwatch.model.EventType;
 import com.syncwatch.model.PlayerEvent;
-import com.syncwatch.service.RoomService;
-import com.syncwatch.service.RoomService.BufferingResult;
+import com.syncwatch.service.BufferingCoordinator;
+import com.syncwatch.service.BufferingCoordinator.BufferingResult;
 import com.syncwatch.sync.PlayerEventHandler;
 import com.syncwatch.sync.RoomBroadcaster;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class BufferingStartEventHandler implements PlayerEventHandler {
 
-    private final RoomService roomService;
+    private final BufferingCoordinator buffering;
     private final RoomBroadcaster broadcaster;
 
     @Override
@@ -26,7 +26,7 @@ public class BufferingStartEventHandler implements PlayerEventHandler {
     @Override
     public void handle(String roomId, PlayerEvent event, String sessionId) {
         // keyed by WebSocket session so the hold can be released on disconnect
-        BufferingResult result = roomService.bufferingStart(roomId, sessionId);
+        BufferingResult result = buffering.start(roomId, sessionId);
         if (result == null) return;
         if (result.clockChanged()) broadcaster.clock(roomId, result.clock());
         broadcaster.buffering(roomId, result.count());

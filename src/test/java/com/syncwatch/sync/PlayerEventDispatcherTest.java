@@ -2,6 +2,7 @@ package com.syncwatch.sync;
 
 import com.syncwatch.model.EventType;
 import com.syncwatch.model.PlayerEvent;
+import com.syncwatch.service.InMemoryRoomRepository;
 import com.syncwatch.service.RoomService;
 import com.syncwatch.service.SourceCacheService;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +36,7 @@ class PlayerEventDispatcherTest {
         }
     }
 
-    private final RoomService rooms = new RoomService(new SourceCacheService());
+    private final RoomService rooms = new RoomService(new InMemoryRoomRepository(), new SourceCacheService());
 
     private static PlayerEvent event(EventType type) {
         PlayerEvent e = new PlayerEvent();

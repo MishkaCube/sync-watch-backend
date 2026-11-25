@@ -31,7 +31,7 @@ class PlaybackBarrierServiceTest {
     @BeforeEach
     void setUp() {
         publisher = mock(RoomEventPublisher.class);
-        rooms = new RoomService(new SourceCacheService());
+        rooms = new RoomService(new InMemoryRoomRepository(), new SourceCacheService());
         participants = new ParticipantService();
         barrier = new PlaybackBarrierService(publisher, rooms, participants);
     }
