@@ -1,5 +1,9 @@
 # sync-watch-backend
 
+[![CI](https://github.com/MishkaCube/sync-watch-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/MishkaCube/sync-watch-backend/actions/workflows/ci.yml)
+![Java 21](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-6db33f)
+
 Backend for **Sync Watch**, a small pet project for watching videos together in sync. One person creates a room, shares the link, and every participant's player stays at the same position: play, pause, seek and buffering are coordinated by the server.
 
 Frontend: [`sync-watch-frontend`](https://github.com/MishkaCube/sync-watch-frontend) (TypeScript).
@@ -56,6 +60,24 @@ client A ── play ──▶  /app/room/{id}/event
 
 WebSocket endpoint: `/ws` (SockJS fallback). Heartbeat: 1 s.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    C[Browser clients] -- "REST /api" --> CT[Controllers]
+    C -- "STOMP over WebSocket /ws" --> CT
+    CT --> RS[RoomService<br/>room state and clock]
+    CT --> PB[PlaybackBarrierService<br/>prepare, ready, go]
+    CT --> PS[PresenceService<br/>heartbeats and quality]
+    CT --> CH[ChatHistoryService<br/>Caffeine]
+    CT --> FS[FileStorageService<br/>uploads, Range streaming]
+    CT --> HC[HlsSegmentCache<br/>proxy, prefetch, retries]
+    RS --- M[(In-memory state)]
+    FS --- D[(Disk)]
+    HC --- D
+    HC -- "fetch segments" --> X[External HLS sources]
+```
+
 ## Getting started
 
 Requirements: JDK 21.
@@ -65,6 +87,28 @@ Requirements: JDK 21.
 ```
 
 The server starts on `http://localhost:8080`. Run the frontend on `http://localhost:5173` (the default allowed origin).
+
+### Run with Docker
+
+```bash
+docker compose up --build
+```
+
+This builds a multi-stage image (JDK 21 build, JRE 21 runtime, non-root user, health check) and exposes the backend on `http://localhost:8080`.
+
+## Tests
+
+```bash
+./gradlew test
+```
+
+The suite has 42 tests and runs in a few seconds:
+
+- **Unit tests** for the playback clock, room state (including buffering coordination and recovery after a client disconnects), participants, presence and chat history.
+- **Barrier tests** with a mocked message broker: `go` is sent only after every participant is ready, duplicate `ready` events are counted once, and `cancel` drops a pending start.
+- **End-to-end tests** that boot the whole application on a random port and drive it like a real client over REST and STOMP/WebSocket: create a room, subscribe, press play, answer `prepare` with `ready`, and receive `go` plus a playing clock.
+
+GitHub Actions runs the tests on every pull request and push to `develop`, and checks that the Docker image builds.
 
 ### Configuration
 
@@ -98,15 +142,14 @@ src/main/java/com/syncwatch
 
 - Room state is in memory: one instance, no persistence, rooms are lost on restart.
 - No authentication: anyone with a room link can join.
-- No automated tests yet.
+- The 6 second barrier timeout and the 12 second presence expiry are not covered by tests yet.
 - CORS is configured for local development.
 
 ## Roadmap
 
-- Integration tests for the playback barrier and clock logic
+- Tests for the barrier timeout and presence expiry (needs an injectable clock)
 - Redis (or similar) for shared room state and horizontal scaling
 - Authentication and room access control
-- Docker image and `docker compose` setup
 
 ## License
 
