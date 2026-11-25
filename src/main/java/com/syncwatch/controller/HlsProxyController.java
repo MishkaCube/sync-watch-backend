@@ -16,7 +16,6 @@ import java.nio.file.Path;
 @RestController
 @RequestMapping("/api/hls")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
 public class HlsProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(HlsProxyController.class);

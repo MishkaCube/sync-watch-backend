@@ -11,14 +11,15 @@ rezka:
     python: python3
 
 syncwatch:
+  cors:
+    allowed-origins: "http://localhost:5173"   # REST API, comma-separated
+  websocket:
+    allowed-origin-patterns: "*"
   room:
     idle-ttl-minutes: 60        # удалять комнату после часа без активности и участников
     cleanup-interval-ms: 900000 # проверять каждые 15 минут
 
 spring:
-  web:
-    cors:
-      allowed-origins: "http://localhost:5173"
   servlet:
     multipart:
       max-file-size: 4GB
