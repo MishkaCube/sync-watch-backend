@@ -31,6 +31,10 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Spring Boot 4 moved web test support out of the main test starter
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-resttestclient'
+    testImplementation 'org.springframework.boot:spring-boot-starter-restclient'
 }
 
 tasks.named('test') {

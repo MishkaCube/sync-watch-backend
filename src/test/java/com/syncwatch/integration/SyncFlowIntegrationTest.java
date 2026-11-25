@@ -6,11 +6,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"rezka.service.enabled=false", "rezka.feature.enabled=false"})
+@AutoConfigureTestRestTemplate
 class SyncFlowIntegrationTest {
 
     @LocalServerPort
@@ -47,7 +49,7 @@ class SyncFlowIntegrationTest {
     @BeforeEach
     void setUp() {
         stomp = new WebSocketStompClient(new StandardWebSocketClient());
-        stomp.setMessageConverter(new MappingJackson2MessageConverter());
+        stomp.setMessageConverter(new JacksonJsonMessageConverter());
     }
 
     @AfterEach
