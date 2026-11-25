@@ -1,5 +1,6 @@
 package com.syncwatch.controller;
 
+import com.syncwatch.messaging.RoomEventPublisher;
 import com.syncwatch.model.BufferingEvent;
 import com.syncwatch.model.ChatMessage;
 import com.syncwatch.model.ClockEvent;
@@ -18,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -27,7 +27,7 @@ public class PlayerSyncController {
 
     private static final Logger log = LoggerFactory.getLogger(PlayerSyncController.class);
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RoomEventPublisher publisher;
     private final RoomService roomService;
     private final ChatHistoryService chatHistory;
     private final PlaybackBarrierService barrier;
@@ -63,17 +63,17 @@ public class PlayerSyncController {
             case READY -> barrier.markReady(roomId, event.getSenderId());
             case PRESENCE -> {
                 var users = presence.update(roomId, event.getSenderId(), event.getQuality());
-                messagingTemplate.convertAndSend("/topic/room." + roomId, new LobbyEvent(users));
+                publisher.publish(roomId, new LobbyEvent(users));
             }
             case SOURCE_CHANGE -> {
                 roomService.updateLastSource(roomId, event);
-                messagingTemplate.convertAndSend("/topic/room." + roomId, event);
+                publisher.publish(roomId, event);
                 log.info("Room {} source changed", roomId);
             }
             case SOURCE_RESET -> {
                 barrier.cancel(roomId);
                 RoomClock clock = roomService.resetSource(roomId);
-                messagingTemplate.convertAndSend("/topic/room." + roomId, event);
+                publisher.publish(roomId, event);
                 if (clock != null) broadcastClock(roomId, clock);
                 broadcastBuffering(roomId, 0);   // clear any stuck buffering overlay
                 log.info("Room {} source reset", roomId);
@@ -103,7 +103,7 @@ public class PlayerSyncController {
                     if (safe.length() > 500) safe = safe.substring(0, 500);
                     ChatMessage msg = new ChatMessage(event.getSenderId(), safe, System.currentTimeMillis());
                     chatHistory.add(roomId, msg);
-                    messagingTemplate.convertAndSend("/topic/room." + roomId, msg);
+                    publisher.publish(roomId, msg);
                 }
             }
             default -> log.debug("Room {} unhandled event type: {}", roomId, type);
@@ -112,10 +112,10 @@ public class PlayerSyncController {
 
     private void broadcastClock(String roomId, RoomClock clock) {
         if (clock == null) return;
-        messagingTemplate.convertAndSend("/topic/room." + roomId, ClockEvent.from(clock));
+        publisher.publish(roomId, ClockEvent.from(clock));
     }
 
     private void broadcastBuffering(String roomId, int count) {
-        messagingTemplate.convertAndSend("/topic/room." + roomId, new BufferingEvent(count));
+        publisher.publish(roomId, new BufferingEvent(count));
     }
 }

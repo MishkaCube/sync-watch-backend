@@ -1,11 +1,11 @@
 package com.syncwatch.service;
 
+import com.syncwatch.messaging.RoomEventPublisher;
 import com.syncwatch.model.ClockEvent;
 import com.syncwatch.model.RoomClock;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -27,7 +27,7 @@ public class PlaybackBarrierService {
     private static final Logger log = LoggerFactory.getLogger(PlaybackBarrierService.class);
     private static final long TIMEOUT_MS = 6000;   // start anyway after this, with whoever's ready
 
-    private final SimpMessagingTemplate broker;
+    private final RoomEventPublisher publisher;
     private final RoomService roomService;
     private final ParticipantService participantService;
 
@@ -47,10 +47,10 @@ public class PlaybackBarrierService {
 
         // freeze the clock (paused) at the target so the drift loop stays calm
         RoomClock clock = roomService.clockPause(roomId, position);
-        broker.convertAndSend("/topic/room." + roomId, ClockEvent.from(clock));
+        publisher.publish(roomId, ClockEvent.from(clock));
 
         // tell everyone to seek + prebuffer
-        broker.convertAndSend("/topic/room." + roomId,
+        publisher.publish(roomId,
                 Map.of("type", "prepare", "position", position));
 
         ScheduledFuture<?> timeout = scheduler.schedule(
@@ -84,9 +84,9 @@ public class PlaybackBarrierService {
 
         RoomClock clock = roomService.clockPlay(roomId, p.position());
         // explicit "go" → clients play immediately (already buffered)
-        broker.convertAndSend("/topic/room." + roomId,
+        publisher.publish(roomId,
                 Map.of("type", "go", "position", p.position()));
-        broker.convertAndSend("/topic/room." + roomId, ClockEvent.from(clock));
+        publisher.publish(roomId, ClockEvent.from(clock));
         log.info("Room {} barrier: GO at {}s", roomId, (long) p.position());
     }
 }

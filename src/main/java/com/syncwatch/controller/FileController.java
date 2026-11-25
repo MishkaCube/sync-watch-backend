@@ -1,5 +1,6 @@
 package com.syncwatch.controller;
 
+import com.syncwatch.messaging.RoomEventPublisher;
 import com.syncwatch.model.EventType;
 import com.syncwatch.model.PlayerEvent;
 import com.syncwatch.service.FileStorageService;
@@ -9,7 +10,6 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,7 +24,7 @@ import java.util.Map;
 public class FileController {
 
     private final FileStorageService fileStorageService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RoomEventPublisher publisher;
 
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> upload(
@@ -41,7 +41,7 @@ public class FileController {
         event.setSenderId("server");
         event.setSourceType("url");
         event.setSourceValue(fileUrl);
-        messagingTemplate.convertAndSend("/topic/room." + roomId, event);
+        publisher.publish(roomId, event);
 
         return ResponseEntity.ok(Map.of("url", fileUrl, "name", stored.name()));
     }

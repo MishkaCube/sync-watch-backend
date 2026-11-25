@@ -1,11 +1,11 @@
 package com.syncwatch.service;
 
+import com.syncwatch.messaging.RoomEventPublisher;
 import com.syncwatch.model.ClockEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -22,24 +22,23 @@ import static org.mockito.Mockito.verify;
 class PlaybackBarrierServiceTest {
 
     private static final String ROOM = "room-1";
-    private static final String TOPIC = "/topic/room." + ROOM;
 
-    private SimpMessagingTemplate broker;
+    private RoomEventPublisher publisher;
     private RoomService rooms;
     private ParticipantService participants;
     private PlaybackBarrierService barrier;
 
     @BeforeEach
     void setUp() {
-        broker = mock(SimpMessagingTemplate.class);
+        publisher = mock(RoomEventPublisher.class);
         rooms = new RoomService(new SourceCacheService());
         participants = new ParticipantService();
-        barrier = new PlaybackBarrierService(broker, rooms, participants);
+        barrier = new PlaybackBarrierService(publisher, rooms, participants);
     }
 
     private List<Object> sentToRoom() {
         ArgumentCaptor<Object> payloads = ArgumentCaptor.forClass(Object.class);
-        verify(broker, org.mockito.Mockito.atLeast(0)).convertAndSend(eq(TOPIC), payloads.capture());
+        verify(publisher, org.mockito.Mockito.atLeast(0)).publish(eq(ROOM), payloads.capture());
         return payloads.getAllValues();
     }
 
@@ -128,7 +127,7 @@ class PlaybackBarrierServiceTest {
     void readyWithoutPending() {
         barrier.markReady(ROOM, "alice");
 
-        verify(broker, never()).convertAndSend(eq(TOPIC), org.mockito.ArgumentMatchers.<Object>any());
+        verify(publisher, never()).publish(eq(ROOM), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

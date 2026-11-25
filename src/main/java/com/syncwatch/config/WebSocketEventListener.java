@@ -1,5 +1,7 @@
 package com.syncwatch.config;
 
+import com.syncwatch.messaging.RoomEventPublisher;
+import com.syncwatch.messaging.RoomTopics;
 import com.syncwatch.model.BufferingEvent;
 import com.syncwatch.model.ClockEvent;
 import com.syncwatch.model.ParticipantEvent;
@@ -8,7 +10,6 @@ import com.syncwatch.service.RoomService.BufferingResult;
 import com.syncwatch.service.ParticipantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -20,7 +21,7 @@ public class WebSocketEventListener {
 
     private final ParticipantService participantService;
     private final RoomService roomService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RoomEventPublisher publisher;
 
     @EventListener
     public void handleSubscribe(SessionSubscribeEvent event) {
@@ -29,12 +30,11 @@ public class WebSocketEventListener {
         String sessionId = accessor.getSessionId();
         if (destination == null || sessionId == null) return;
 
-        if (destination.startsWith("/topic/room.")) {
-            String roomId = destination.substring("/topic/room.".length());
+        RoomTopics.roomIdOf(destination).ifPresent(roomId -> {
             int previous = participantService.getCount(roomId);
             int count = participantService.join(sessionId, roomId);
             broadcastParticipants(roomId, count, previous);
-        }
+        });
     }
 
     @EventListener
@@ -50,9 +50,9 @@ public class WebSocketEventListener {
         BufferingResult buf = roomService.bufferingRemove(roomId, sessionId);
         if (buf != null) {
             if (buf.clockChanged()) {
-                messagingTemplate.convertAndSend("/topic/room." + roomId, ClockEvent.from(buf.clock()));
+                publisher.publish(roomId, ClockEvent.from(buf.clock()));
             }
-            messagingTemplate.convertAndSend("/topic/room." + roomId, new BufferingEvent(buf.count()));
+            publisher.publish(roomId, new BufferingEvent(buf.count()));
         }
 
         int previous = participantService.getCount(roomId);
@@ -63,7 +63,7 @@ public class WebSocketEventListener {
     }
 
     private void broadcastParticipants(String roomId, int count, int previous) {
-        messagingTemplate.convertAndSend("/topic/room." + roomId,
+        publisher.publish(roomId,
                 new ParticipantEvent("participants-update", count, previous));
     }
 }
