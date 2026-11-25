@@ -163,9 +163,29 @@ class SyncFlowIntegrationTest {
                 inbox.add((Map<String, Object>) payload);
             }
         });
-        // the subscription is what registers the participant; wait for the room to see it
-        awaitMessage(inbox, "participants-update");
+        awaitSubscriptionActive(roomId, inbox);
         return inbox;
+    }
+
+    /**
+     * The server announces a new participant before the broker has finished registering the
+     * subscription, so waiting for that announcement is racy on a slow machine. Instead, send
+     * presence heartbeats until the lobby update comes back: that proves messages sent to the
+     * room reach this client.
+     */
+    private void awaitSubscriptionActive(String roomId, BlockingQueue<Map<String, Object>> inbox)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            session.send("/app/room/" + roomId + "/event",
+                    Map.of("type", "presence", "senderId", "probe", "quality", "good"));
+            Map<String, Object> message = inbox.poll(250, TimeUnit.MILLISECONDS);
+            if (message != null && "lobby".equals(message.get("type"))) {
+                inbox.clear();
+                return;
+            }
+        }
+        throw new AssertionError("The subscription to room " + roomId + " did not become active within 10 seconds");
     }
 
     private static Map<String, Object> awaitMessage(BlockingQueue<Map<String, Object>> inbox, String type)
