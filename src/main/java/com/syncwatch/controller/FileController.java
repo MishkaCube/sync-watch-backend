@@ -1,5 +1,7 @@
 package com.syncwatch.controller;
 
+import com.syncwatch.http.ByteRange;
+import com.syncwatch.http.RangeHeaderParser;
 import com.syncwatch.messaging.RoomEventPublisher;
 import com.syncwatch.model.EventType;
 import com.syncwatch.model.PlayerEvent;
@@ -61,28 +63,27 @@ public class FileController {
         headers.set(HttpHeaders.CONTENT_TYPE, stored.contentType());
         headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
 
-        if (rangeHeader == null) {
+        ByteRange range;
+        try {
+            range = RangeHeaderParser.parse(rangeHeader, fileSize).orElse(null);
+        } catch (RangeHeaderParser.RangeNotSatisfiableException e) {
+            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                    .header(HttpHeaders.CONTENT_RANGE, "bytes */" + fileSize)
+                    .build();
+        }
+
+        if (range == null) {   // no (usable) Range header: send the whole file
             headers.set(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileSize));
             return ResponseEntity.ok().headers(headers).body(resource);
         }
 
-        // parse "bytes=start-end"
-        String range = rangeHeader.replace("bytes=", "");
-        String[] parts = range.split("-");
-        long start = Long.parseLong(parts[0]);
-        long end = parts.length > 1 && !parts[1].isBlank()
-                ? Long.parseLong(parts[1])
-                : fileSize - 1;
-        end = Math.min(end, fileSize - 1);
-        long contentLength = end - start + 1;
-
-        headers.set(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileSize);
-        headers.set(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength));
+        headers.set(HttpHeaders.CONTENT_RANGE, "bytes " + range.start() + "-" + range.end() + "/" + fileSize);
+        headers.set(HttpHeaders.CONTENT_LENGTH, String.valueOf(range.length()));
 
         // Spring's FileSystemResource doesn't support partial read directly,
         // so return a ResourceRegion via a sliced response
         return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
                 .headers(headers)
-                .body(new PartialFileResource(stored.path(), start, contentLength));
+                .body(new PartialFileResource(stored.path(), range.start(), range.length()));
     }
 }
