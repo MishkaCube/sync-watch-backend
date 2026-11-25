@@ -102,11 +102,11 @@ This builds a multi-stage image (JDK 21 build, JRE 21 runtime, non-root user, he
 ./gradlew test
 ```
 
-The suite has 42 tests and runs in a few seconds:
+The suite has 93 tests and runs in a few seconds:
 
-- **Unit tests** for the playback clock, room state (including buffering coordination and recovery after a client disconnects), participants, presence and chat history.
+- **Unit tests** for the playback clock, rooms and their repository, buffering coordination (including recovery after a client disconnects), participants, presence, chat history, the event dispatcher and handlers, HLS manifest rewriting and Range header parsing.
 - **Barrier tests** with a mocked message broker: `go` is sent only after every participant is ready, duplicate `ready` events are counted once, and `cancel` drops a pending start.
-- **End-to-end tests** that boot the whole application on a random port and drive it like a real client over REST and STOMP/WebSocket: create a room, subscribe, press play, answer `prepare` with `ready`, and receive `go` plus a playing clock.
+- **End-to-end tests** that boot the whole application and drive it like a real client: over REST and STOMP/WebSocket (create a room, subscribe, press play, answer `prepare` with `ready`, receive `go` plus a playing clock), file upload with Range streaming, and the CORS policy.
 
 GitHub Actions runs the tests on every pull request and push to `develop`, and checks that the Docker image builds.
 
@@ -132,11 +132,23 @@ A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds the `bootJar` 
 
 ```
 src/main/java/com/syncwatch
-├── config/       WebSocket (STOMP) config, connection events, optional helper runner
-├── controller/   REST + STOMP controllers (rooms, files, HLS proxy, player sync, health, config)
+├── config/       WebSocket (STOMP) and CORS config, connection events, optional helper runner
+├── controller/   Thin REST and STOMP entry points (rooms, files, HLS proxy, player sync, health, config)
+├── sync/         PlayerEventDispatcher and one handler per event type (play, pause, seek, chat, ...)
+├── messaging/    RoomEventPublisher abstraction and the STOMP implementation, RoomTopics
+├── hls/          HlsManifestRewriter: pure playlist rewriting
+├── http/         RangeHeaderParser: HTTP Range parsing
 ├── model/        Room, RoomClock, events and DTOs
-└── service/      Rooms, participants, presence, playback barrier, HLS cache, cleanup scheduler
+└── service/      RoomService, RoomRepository, BufferingCoordinator, presence, playback barrier,
+                  HLS segment cache, cleanup scheduler
 ```
+
+## Design notes
+
+- **One reason to change per class.** Controllers only translate HTTP and STOMP into calls. Parsing logic (`RangeHeaderParser`, `HlsManifestRewriter`) is pure and unit tested. Buffering coordination lives in `BufferingCoordinator`, separate from the room lifecycle and clock in `RoomService`.
+- **Open for new events.** Each player event type has its own `PlayerEventHandler`. A new event means a new class; the dispatcher and the controller do not change. Two handlers for one type fail at startup.
+- **Depend on abstractions.** Services publish through `RoomEventPublisher` instead of a concrete messaging template, and rooms are stored behind `RoomRepository`. The in-memory repository can be replaced (for example by Redis) without touching the services.
+- **Configuration in one place.** CORS origins and WebSocket origin patterns are properties, not annotations scattered over controllers.
 
 ## Known limitations
 
@@ -148,7 +160,7 @@ src/main/java/com/syncwatch
 ## Roadmap
 
 - Tests for the barrier timeout and presence expiry (needs an injectable clock)
-- Redis (or similar) for shared room state and horizontal scaling
+- A Redis-backed `RoomRepository` for shared room state and horizontal scaling
 - Authentication and room access control
 
 ## License
